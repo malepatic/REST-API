@@ -1,18 +1,20 @@
 const express = require('express');
-const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/user');
-const upload = require('../middleware/upload');
+const upload = require('../middleware/upload'); // importing the middleware here
+
+const router = express.Router();
 
 // Create a new user
 router.post('/create', async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
 
-    // Validate password strength
     const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/;
     if (!passwordRegex.test(password)) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character' });
+      return res.status(400).json({
+        message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -38,7 +40,7 @@ router.put('/edit', async (req, res) => {
     if (password) {
       const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/;
       if (!passwordRegex.test(password)) {
-        return res.status(400).json({ message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character' });
+        return res.status(400).json({ message: 'Password must meet complexity requirements' });
       }
       user.password = await bcrypt.hash(password, 10);
     }
