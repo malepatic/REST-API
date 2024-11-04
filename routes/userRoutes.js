@@ -69,7 +69,7 @@ router.delete('/delete', async (req, res) => {
 // Retrieve all users
 router.get('/getAll', async (req, res) => {
   try {
-    const users = await User.find({}, 'fullName email password');
+    const users = await User.find({}, 'fullName email password imagePath');
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -83,12 +83,12 @@ router.post('/uploadImage', upload.single('image'), async (req, res) => {
         const username = req.body.username;
         //console.log(req.file.filename)
         console.log(username)
-        if (!userId) {
+        if (!username) {
             return res.status(400).json({ message: 'User ID is required' });
         }
 
         // Validate user in the database
-        const user = await User.findOne({fullName:userId});
+        const user = await User.findOne({fullName:username});
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
