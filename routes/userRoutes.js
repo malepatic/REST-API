@@ -76,27 +76,44 @@ router.get('/getAll', async (req, res) => {
   }
 });
 
-// Upload image
+// Route to upload an image
 router.post('/uploadImage', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+    try {
+        // Check if user ID is present and valid
+        const username = req.body.username;
+        //console.log(req.file.filename)
+        console.log(username)
+        if (!userId) {
+            return res.status(400).json({ message: 'User ID is required' });
+        }
+
+        // Validate user in the database
+        const user = await User.findOne({fullName:userId});
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Check if file exists in the request
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        // Save the file path to the user's profile in the database
+        const filePath = `images/${req.file.filename}`;
+        console.log("filePath" + filePath)
+        const result = await User.updateOne(
+          { fullName: username }, 
+          { $set: { imagePath: filePath } } // Set the new field
+      );
+        await user.save();
+
+        res.status(200).json({
+            message: 'Image uploaded successfully',
+            filePath: filePath
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
-
-    const { email } = req.body;
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    user.imagePath = req.file.path;
-    await user.save();
-
-    res.json({ message: 'Image uploaded successfully', filePath: req.file.path });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
 });
-
 module.exports = router;
