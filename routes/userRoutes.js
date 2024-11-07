@@ -1,25 +1,55 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const User = require('../models/user');
-const upload = require('../middleware/upload'); // importing the middleware here
+const upload = require('../middleware/upload'); // Import middleware for file uploads
 
 const router = express.Router();
+
+// Validation function for password
+function isPasswordValid(password) {
+  const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/;
+  return passwordRegex.test(password);
+}
+
+// Validation function for full name
+function isFullNameValid(fullName) {
+  return /^[A-Z]/.test(fullName);
+}
+
+// Validation function for email (checks if Gmail and no match with fullName)
+function isEmailValid(email, fullName) {
+  const isGmail = /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
+  const doesNotMatchFullName = fullName.toLowerCase() !== email.split('@')[0].toLowerCase();
+  return isGmail && doesNotMatchFullName;
+}
 
 // Create a new user
 router.post('/create', async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
 
-    const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/;
-    if (!passwordRegex.test(password)) {
+    // Full name validation
+    if (!isFullNameValid(fullName)) {
+      return res.status(400).json({ message: 'Full name must start with a capital letter.' });
+    }
+
+    // Email validation
+    if (!isEmailValid(email, fullName)) {
+      return res.status(400).json({ message: 'Email must be a Gmail address and not match the full name.' });
+    }
+
+    // Password validation
+    if (!isPasswordValid(password)) {
       return res.status(400).json({
-        message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+        message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.'
       });
     }
 
+    // Hash password and create new user
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({ fullName, email, password: hashedPassword });
     await user.save();
+
     res.status(201).json({ message: 'User created successfully' });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -33,17 +63,19 @@ router.put('/edit', async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: 'User cannot be updated ' });
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    if (fullName && !isFullNameValid(fullName)) {
+      return res.status(400).json({ message: 'Full name must start with a capital letter.' });
+    }
+    
+    if (password && !isPasswordValid(password)) {
+      return res.status(400).json({ message: 'Password must meet complexity requirements.' });
     }
 
     if (fullName) user.fullName = fullName;
-    if (password) {
-      const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/;
-      if (!passwordRegex.test(password)) {
-        return res.status(400).json({ message: 'Password must meet complexity requirements' });
-      }
-      user.password = await bcrypt.hash(password, 10);
-    }
+    if (password) user.password = await bcrypt.hash(password, 10);
 
     await user.save();
     res.json({ message: 'User updated successfully' });
@@ -57,9 +89,11 @@ router.delete('/delete', async (req, res) => {
   try {
     const { email } = req.body;
     const result = await User.findOneAndDelete({ email });
+    
     if (!result) {
       return res.status(404).json({ message: 'User not found' });
     }
+    
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -76,44 +110,35 @@ router.get('/getAll', async (req, res) => {
   }
 });
 
-// Route to upload an image
+// Upload an image for a user
 router.post('/uploadImage', upload.single('image'), async (req, res) => {
-    try {
-        // Check if user ID is present and valid
-        const username = req.body.username;
-        //console.log(req.file.filename)
-        console.log(username)
-        if (!username) {
-            return res.status(400).json({ message: 'User ID is required' });
-        }
+  try {
+    const { username } = req.body;
 
-        // Validate user in the database
-        const user = await User.findOne({fullName:username});
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Check if file exists in the request
-        if (!req.file) {
-            return res.status(400).json({ message: 'No file uploaded' });
-        }
-
-        // Save the file path to the user's profile in the database
-        const filePath = `images/${req.file.filename}`;
-        console.log("filePath" + filePath)
-        const result = await User.updateOne(
-          { fullName: username }, 
-          { $set: { imagePath: filePath } } // Set the new field
-      );
-        await user.save();
-
-        res.status(200).json({
-            message: 'Image uploaded successfully',
-            filePath: filePath
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+    if (!username) {
+      return res.status(400).json({ message: 'Username is required' });
     }
+
+    const user = await User.findOne({ fullName: username });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const filePath = `images/${req.file.filename}`;
+    user.imagePath = filePath;
+    await user.save();
+
+    res.status(200).json({
+      message: 'Image uploaded successfully',
+      filePath: filePath
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
 });
+
 module.exports = router;
