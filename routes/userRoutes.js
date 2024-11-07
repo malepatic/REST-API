@@ -33,7 +33,7 @@ router.put('/edit', async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User cannot be updated ' });
     }
 
     if (fullName) user.fullName = fullName;
